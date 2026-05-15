@@ -1,90 +1,85 @@
-import { logger, LogLevel } from '@/lib/logger';
-
-// Mock console methods
-const originalConsole = { ...console };
+import { logger } from '@/lib/logger';
 
 describe('Logger', () => {
+  let logSpy: jest.SpiedFunction<typeof console.log>;
+  let errorSpy: jest.SpiedFunction<typeof console.error>;
+  let warnSpy: jest.SpiedFunction<typeof console.warn>;
+  let debugSpy: jest.SpiedFunction<typeof console.debug>;
+
   beforeEach(() => {
-    // Reset console mocks
-    console.log = jest.fn();
-    console.error = jest.fn();
-    console.warn = jest.fn();
-    console.debug = jest.fn();
+    logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    // Restore original console
-    Object.assign(console, originalConsole);
+    jest.restoreAllMocks();
   });
 
-  describe('log levels', () => {
-    it('should log info messages', () => {
-      logger.info('Test info message');
-      expect(console.log).toHaveBeenCalledWith(
-        expect.stringContaining('[INFO]')
-      );
-      expect(console.log).toHaveBeenCalledWith(
-        expect.stringContaining('Test info message')
-      );
-    });
+  it('logs info messages', () => {
+    logger.info('Test info message');
 
-    it('should log error messages', () => {
-      logger.error('Test error message');
-      expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining('[ERROR]')
-      );
-      expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining('Test error message')
-      );
-    });
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    expect(logSpy.mock.calls[0][0]).toContain('[INFO]');
+    expect(logSpy.mock.calls[0][0]).toContain('Test info message');
+  });
 
-    it('should log warning messages', () => {
-      logger.warn('Test warning message');
-      expect(console.warn).toHaveBeenCalledWith(
-        expect.stringContaining('[WARN]')
-      );
-      expect(console.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Test warning message')
-      );
-    });
+  it('logs error messages', () => {
+    logger.error('Test error message');
 
-    it('should log debug messages in development', () => {
-      const originalEnv = process.env.NODE_ENV;
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy.mock.calls[0][0]).toContain('[ERROR]');
+    expect(errorSpy.mock.calls[0][0]).toContain('Test error message');
+  });
+
+  it('logs warning messages', () => {
+    logger.warn('Test warning message');
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][0]).toContain('[WARN]');
+    expect(warnSpy.mock.calls[0][0]).toContain('Test warning message');
+  });
+
+  it('logs debug messages in development', () => {
+    const originalEnv = process.env.NODE_ENV;
+
+    try {
       process.env.NODE_ENV = 'development';
-
       logger.debug('Test debug message');
-      expect(console.debug).toHaveBeenCalledWith(
-        expect.stringContaining('[DEBUG]')
-      );
 
+      expect(debugSpy).toHaveBeenCalledTimes(1);
+      expect(debugSpy.mock.calls[0][0]).toContain('[DEBUG]');
+      expect(debugSpy.mock.calls[0][0]).toContain('Test debug message');
+    } finally {
       process.env.NODE_ENV = originalEnv;
-    });
+    }
   });
 
-  describe('log with metadata', () => {
-    it('should include metadata in log output', () => {
-      logger.info('Test message', { key: 'value', number: 123 });
-      const logCall = (console.log as jest.Mock).mock.calls[0][0];
-      expect(logCall).toContain('Test message');
-      expect(logCall).toContain('"key":"value"');
-      expect(logCall).toContain('"number":123');
-    });
+  it('includes metadata in log output', () => {
+    logger.info('Test message', { key: 'value', number: 123 });
+
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    const output = logSpy.mock.calls[0][0];
+    expect(output).toContain('Test message');
+    expect(output).toContain('"key":"value"');
+    expect(output).toContain('"number":123');
   });
 
-  describe('logError', () => {
-    it('should log error objects with stack trace', () => {
-      const error = new Error('Test error');
-      logger.logError(error, { context: 'test' });
+  it('logs error objects with stack trace', () => {
+    const error = new Error('Test error');
 
-      expect(console.error).toHaveBeenCalled();
-      const logCall = (console.error as jest.Mock).mock.calls[0][0];
-      expect(logCall).toContain('Test error');
-      expect(logCall).toContain('context');
-    });
+    logger.logError(error, { context: 'test' });
 
-    it('should handle non-Error objects', () => {
-      logger.logError('String error', { context: 'test' });
-      expect(console.error).toHaveBeenCalled();
-    });
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    const output = errorSpy.mock.calls[0][0];
+    expect(output).toContain('Test error');
+    expect(output).toContain('context');
+  });
+
+  it('handles non-Error objects', () => {
+    logger.logError('String error', { context: 'test' });
+
+    expect(errorSpy).toHaveBeenCalledTimes(1);
   });
 });
